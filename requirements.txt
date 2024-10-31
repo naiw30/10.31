@@ -1,1 +1,5 @@
-
+tempfile
+cv2
+ultralytics
+PIL
+moviepy.editor
