@@ -4,7 +4,7 @@ import streamlit as st
 st.set_page_config(layout="wide")
 
 # 제목 설정
-st.title("당신은 너굴너굴 저주에 걸리셨습니다")
+st.title("당신은 라쿤라쿤 저주에 걸리셨습니다")
 
 # 전체 레이아웃을 컨테이너로 감싸기
 with st.container():
@@ -28,6 +28,8 @@ with st.container():
             st.write("여기에 사물 검출 결과가 표시됩니다.")
 
 # 사물 검출 버튼 추가
+
+st.title("이 영상을 보고 자라나라 머리머리를 큰 소리로 3번 외치지 않으면...")
 if st.button("사물 검출 실행"):
     if uploaded_file is not None:
         st.session_state["processed_video"] = uploaded_file
