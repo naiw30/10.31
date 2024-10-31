@@ -4,7 +4,7 @@ import streamlit as st
 st.set_page_config(layout="wide")
 
 # 제목 설정
-st.title("비디오 사물 검출 앱")
+st.title("당신은 너굴너굴 저주에 걸리셨습니다")
 
 # 전체 레이아웃을 컨테이너로 감싸기
 with st.container():
