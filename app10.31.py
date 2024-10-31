@@ -1,38 +1,106 @@
 import streamlit as st
+import tempfile
+import cv2
+from ultralytics import YOLO
+from PIL import Image
+from moviepy.editor import VideoFileClip
 
-# 전체 레이아웃을 넓게 설정
-st.set_page_config(layout="wide")
+# Streamlit 페이지 설정
+st.set_page_config(page_title="Sophisticated Batting Swing Detection", page_icon="🎨")
 
-# 제목 설정
-st.title("당신은 라쿤라쿤 저주에 걸리셨습니다")
+# 스타일링 타이틀
+st.markdown(
+    "<h1 style='text-align: center; color: #D2691E;'>Sophisticated Batting Swing Detection</h1>",
+    unsafe_allow_html=True,
+)
+st.markdown(
+    "<h3 style='text-align: center; color: #8B4513;'>Analyze batting swings with ease 🎬</h3>",
+    unsafe_allow_html=True,
+)
 
-# 전체 레이아웃을 컨테이너로 감싸기
-with st.container():
-    col1, col2 = st.columns(2)  # 열을 균등하게 분배하여 넓게 표시
+# 모나리자 이미지 표시
+st.markdown("<h4 style='text-align: center;'>Sample Artwork</h4>", unsafe_allow_html=True)
+monalisa_image = Image.open("monariza.png")  # 모나리자 이미지 경로를 실제 파일 경로로 수정하세요
+st.image(monalisa_image, caption="Mona Lisa (by Leonardo da Vinci)", use_column_width=True)
 
-    # 파일 업로드
-    uploaded_file = st.file_uploader("비디오 파일을 업로드하세요", type=["mp4", "mov", "avi"])
+# 모델 로드 함수
+@st.cache_resource
+def load_model():
+    try:
+        model = YOLO('hitter_trained_model.pt')  # 모델 파일 경로를 확인하세요
+        return model
+    except Exception as e:
+        st.error(f"Error loading model: {e}")
+        return None
 
-    with col1:
-        st.header("원본 영상")
-        if uploaded_file is not None:
-            st.video(uploaded_file)
-        else:
-            st.write("원본 영상을 표시하려면 비디오 파일을 업로드하세요.")
+model = load_model()
+if model is None:
+    st.stop()  # 모델이 없으면 앱 중지
 
-    with col2:
-        st.header("사물 검출 결과 영상")
-        if "processed_video" in st.session_state:
-            st.video(st.session_state["processed_video"])
-        else:
-            st.write("여기에 사물 검출 결과가 표시됩니다.")
+# 클래스 이름 설정
+class_names = ["geonchang", "other_class"]  # 수정 가능한 클래스 이름
 
-# 사물 검출 버튼 추가
+# Sidebar 설정
+st.sidebar.header("Settings ⚙️")
+confidence_threshold = st.sidebar.slider("Confidence Threshold", 0.1, 1.0, 0.6, 0.05)
 
-st.title(f"이 영상을 보고 자라나라 머리머리를 \n큰 소리로 3번 외치지 않으면...")
-if st.button("사물 검출 실행"):
-    if uploaded_file is not None:
-        st.session_state["processed_video"] = uploaded_file
-        st.success("사물 검출이 완료되어 오른쪽에 표시됩니다.")
-    else:
-        st.warning("사물 검출을 실행하려면 비디오 파일을 업로드하세요.")
+# 파일 업로드
+uploaded_file = st.file_uploader("동영상 파일을 업로드하세요", type=["mp4", "avi", "mov"])
+if uploaded_file is not None:
+    st.sidebar.success("파일 업로드 완료")
+
+    # 임시 파일에 업로드된 동영상을 저장
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as temp_video:
+        temp_video.write(uploaded_file.read())
+        temp_video_path = temp_video.name
+
+    # 동영상 로드
+    cap = cv2.VideoCapture(temp_video_path)
+    frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    fps = cap.get(cv2.CAP_PROP_FPS)
+
+    # 결과 동영상 저장
+    output_temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4')
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    out = cv2.VideoWriter(output_temp_file.name, fourcc, fps, (frame_width, frame_height))
+
+    st.write("🔄 **Processing video, please wait...**")
+    
+    # 프레임마다 YOLO 검출 수행
+    while cap.isOpened():
+        ret, frame = cap.read()
+        if not ret:
+            break
+
+        # 모델로 사물 검출 수행
+        results = model(frame)
+
+        for result in results:
+            boxes = result.boxes  # 검출된 박스들
+            for box in boxes:
+                if box.conf >= confidence_threshold:
+                    x1, y1, x2, y2 = map(int, box.xyxy[0])
+                    confidence = box.conf.item()
+                    class_id = int(box.cls.item())
+                    label = f"{class_names[class_id]} {confidence:.2f}"
+                    cv2.rectangle(frame, (x1, y1), (x2, y2), (255, 0, 0), 2)
+                    cv2.putText(frame, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
+
+        out.write(frame)
+
+    # 리소스 해제
+    cap.release()
+    out.release()
+
+    # MoviePy를 사용하여 동영상을 웹 호환 형식으로 변환
+    output_clip = VideoFileClip(output_temp_file.name)
+    output_clip.write_videofile(output_temp_file.name, codec="libx264")
+
+    # Streamlit에 결과 동영상 표시
+    st.video(output_temp_file.name)
+
+    # 완료 메시지
+    st.success("🎉 검출이 완료되었습니다!")
+else:
+    st.write("동영상 파일을 업로드하세요.")
