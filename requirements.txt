@@ -1,5 +1,3 @@
-tempfile
-cv2
-ultralytics
-PIL
-moviepy.editor
+streamlit
+pandas
+sentence_transformers
